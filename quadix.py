@@ -44,7 +44,7 @@ class Voxel(Entity):
         
         if key == 'right mouse down' and mouse.hovered_entity == self:
             new_pos = self.position + mouse.normal
-            Voxel(position=new_pos, texture=blocks[current_texture_index])
+            Voxel(position=new_pos, texture=blocks[hotbar_slots[current_texture_index].block_index])
             place_sound.play()
 
 # Создаем текстовый объект для дебаг-информации
@@ -53,18 +53,20 @@ debug_text = Text(
     origin=(-0.5, 0.5),
     scale=(1, 1),
     color=color.white,
-    background=True,
+    background=False,
     visible=False
 )
 
 def update_debug_info():
+    current_block = blocks[hotbar_slots[current_texture_index].block_index]
     debug_text.text = (
         f"FPS: {round(1/time.dt)}\n"
+        f"Координаты: {round(player.x, 1), round(player.y, 1), round(player.z, 1)}\n"
         f"Объектов: {len(scene.entities)}\n"
         f"Скорость: {round(player.speed, 1)}\n"
         f"Режим полета: {'ВКЛ' if player.flying else 'ВЫКЛ'}\n"
         f"Высота камеры: {round(player.camera_pivot.y, 2)}\n"
-        f"Координаты: {round(player.x, 1), round(player.y, 1), round(player.z, 1)}"
+        f"Блок в руке: {current_block}"
     )
 
 # Настройки игрока
@@ -78,7 +80,7 @@ player.camera_pivot.y = 1.7
 # Настройки окна
 window.color = color.hex("#87CEEB")
 window.title = 'Quadix'
-window.borderless = False  # Окно с рамками по умолчанию
+window.borderless = False
 
 # Настройки зума
 default_fov = 90
@@ -95,12 +97,13 @@ Audio.default_path = './resources/'
 place_sound = Audio('place_block.mp3', autoplay=False)
 destroy_sound = Audio('destroy_block.mp3', autoplay=False)
 
-blocks = ['grass', 'stone', 'dirt', 'planks', 'log', 'leaves', 'emerald_ore', 'dern', 'furnace']
+blocks = ['grass', 'stone', 'dirt', 'planks', 'log', 'leaves', 'emerald_ore', 'dern', 'furnace', 'cooper_ore', 'aluminum_ore', 'gold_ore', 'iron_ore']
 current_texture_index = 0
 
 # Хотбар
+hotbar_slots = []
 for i in range(9):
-    Entity(
+    slot = Entity(
         parent=camera.ui,
         model='quad',
         texture=blocks[i % len(blocks)],
@@ -109,6 +112,8 @@ for i in range(9):
         y=-0.45,
         z=-1
     )
+    slot.block_index = i % len(blocks)
+    hotbar_slots.append(slot)
 
 selector = Entity(
     parent=camera.ui,
@@ -120,8 +125,40 @@ selector = Entity(
     z=-0.9
 )
 
+# Инвентарь
+inventory_bg = Entity(
+    parent=camera.ui,
+    model='quad',
+    color=color.color(0, 0, 0.1, 0.8),
+    scale=(0.5, 0.6),
+    position=(0, 0, -0.5),
+    visible=False
+)
+
+# Предварительная загрузка инвентаря для предотвращения мерцания
+inventory_bg.enabled = False
+
+inventory_slots = []
+for i, block in enumerate(blocks):
+    row = i // 5
+    col = i % 5
+    x = -0.2 + col * 0.1
+    y = 0.2 - row * 0.1
+    
+    slot = Button(
+        parent=inventory_bg,
+        model='quad',
+        texture=block,
+        scale=(0.09 , 0.08),
+        position=(x, y, -0.1),
+        color=color.white,
+        origin=(0, 0)  
+    )
+    slot.block_index = i
+    inventory_slots.append(slot)
+
 player.flying = False
-player.sprint_speed = 8
+player.sprint_speed = 10
 player.sneak_speed = 2
 player.normal_speed = 5
 player.fly_speed = 5
@@ -143,15 +180,25 @@ def respawn_player():
 
 def toggle_fullscreen():
     if window.fullscreen:
-        # Возвращаем в оконный режим
         window.fullscreen = False
         window.borderless = False
         window.size = (1280, 720)
-        window.position = (0, 0)  # Позиция окна при выходе из полноэкранного режима
+        window.position = (0, 0)
     else:
-        # Переходим в полноэкранный режим без рамок
         window.fullscreen = True
         window.borderless = True
+
+def toggle_inventory():
+    inventory_bg.visible = not inventory_bg.visible
+    inventory_bg.enabled = inventory_bg.visible  # Включаем/выключаем обработку
+    mouse.locked = not inventory_bg.visible
+    player.enabled = not inventory_bg.visible
+
+def select_block_from_inventory():
+    if mouse.hovered_entity in inventory_slots:
+        clicked_block_index = mouse.hovered_entity.block_index
+        hotbar_slots[current_texture_index].texture = blocks[clicked_block_index]
+        hotbar_slots[current_texture_index].block_index = clicked_block_index
 
 def update():
     global zooming, is_sneaking
@@ -204,15 +251,21 @@ def input(key):
     if key == 'f11':
         toggle_fullscreen()
     
+    if key == 'e':
+        toggle_inventory()
+    
     if key in ['1', '2', '3', '4', '5', '6', '7', '8', '9']:
         current_texture_index = int(key) - 1
     
     if key == 'scroll down':
-        current_texture_index = (current_texture_index + 1) % len(blocks)
+        current_texture_index = (current_texture_index + 1) % 9
     if key == 'scroll up':
-        current_texture_index = (current_texture_index - 1) % len(blocks)
+        current_texture_index = (current_texture_index - 1) % 9
     if key == 'escape':
-        application.quit()
+        if inventory_bg.visible:
+            toggle_inventory()
+        else:
+            application.quit()
     if key == 'v':
         player.flying = not player.flying
         player.gravity = 0 if player.flying else 1.0
@@ -220,6 +273,14 @@ def input(key):
             player.camera_pivot.y = original_camera_y
     if key == 'r':
         respawn_player()
+    
+    # Выбор блока из инвентаря
+    if key == 'left mouse down' and inventory_bg.visible:
+        select_block_from_inventory()
+
+# Предзагрузка инвентаря
+inventory_bg.enabled = True
+inventory_bg.visible = False
 
 respawn_player()
 app.run()
