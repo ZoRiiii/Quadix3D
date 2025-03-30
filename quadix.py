@@ -1,5 +1,22 @@
 from ursina import *
 from ursina.prefabs.first_person_controller import FirstPersonController
+from pypresence import Presence
+import time
+import os
+
+# Discord RPC инициализация
+try:
+    RPC = Presence("1355918696446562605")
+    RPC.connect()
+    RPC.update(
+        details="Играет в Quadix",
+        state="Строит мир",
+        large_image="quadix_logo",
+        large_text="Quadix Game",
+        start=time.time()
+    )
+except:
+    pass
 
 app = Ursina()
 
@@ -149,7 +166,7 @@ for i, block in enumerate(blocks):
         parent=inventory_bg,
         model='quad',
         texture=block,
-        scale=(0.09 , 0.08),
+        scale=(0.09 , 0.075),
         position=(x, y, -0.1),
         color=color.white,
         origin=(0, 0)  
@@ -200,6 +217,19 @@ def select_block_from_inventory():
         hotbar_slots[current_texture_index].texture = blocks[clicked_block_index]
         hotbar_slots[current_texture_index].block_index = clicked_block_index
 
+def update_rpc_status():
+    try:
+        current_block = blocks[hotbar_slots[current_texture_index].block_index]
+        RPC.update(
+            details=f"Текущий блок: {current_block}",
+            state="File: Quadix.py",
+            large_image="quadix_logo",
+            large_text=current_block,
+            start=time.time()
+        )
+    except:
+        pass
+
 def update():
     global zooming, is_sneaking
     
@@ -224,6 +254,9 @@ def update():
         if is_sneaking:
             is_sneaking = False
             player.camera_pivot.y = original_camera_y
+
+    if time.time() % 15 < time.dt:
+        update_rpc_status()
     
     # Управление зумом
     if held_keys['c']:
@@ -282,5 +315,14 @@ def input(key):
 inventory_bg.enabled = True
 inventory_bg.visible = False
 
+
+# Завершение работы
+def on_exit():
+    try:
+        RPC.close()
+    except:
+        pass
+
+app.on_exit = on_exit
 respawn_player()
 app.run()
