@@ -6,7 +6,7 @@ import os
 
 # Discord RPC инициализация
 try:
-    RPC = Presence("1355918696446562605")
+    RPC = Presence("112233445566778899")
     RPC.connect()
     RPC.update(
         details="Играет в Quadix",
