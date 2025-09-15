@@ -128,11 +128,11 @@ class Player:
         if held_keys['c']:
             if not self.zooming:
                 self.zooming = True
-                self.camera.fov = self.zoom_fov
+                camera.fov = self.zoom_fov
         else:
             if self.zooming:
                 self.zooming = False
-                self.camera.fov = self.default_fov
+                camera.fov = self.default_fov
 
         if self.player.flying:
             if held_keys['space']:
